@@ -30,6 +30,20 @@ Future features (ordered by a rough estimate of how soon I plan to add them):
 
 ...and more! (as I may be forgetting some)
 
+## Building
+IceShell needs libedit to compile and run. It can be built with both `make` and `meson`. The only configuration provided is a debug configuration, a release configuration will be added later.
+
+To build, run:
+```sh
+make
+```
+or:
+```sh
+meson build
+cd build
+ninja
+```
+
 ## Usage
 IceShell works like pretty much any other shell, but with fewer features and greater potential for errors (as of now). 
 The config file `.ishrc` should be placed in your home directory. It only supports aliases at the moment.
