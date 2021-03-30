@@ -31,7 +31,7 @@ Future features (ordered by a rough estimate of how soon I plan to add them):
 ...and more! (as I may be forgetting some)
 
 ## Building
-IceShell needs libedit to compile and run. It can be built with both `make` and `meson`. The only configuration provided is a debug configuration, a release configuration will be added later.
+IceShell needs libedit to build. It can be built with both `make` and `meson`. The only configuration provided is a debug configuration, a release configuration will be added later.
 
 To build, run:
 ```sh
