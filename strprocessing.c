@@ -14,17 +14,20 @@ and limitations under the License.
 #include "strprocessing.h"
 
 char* deleteSpaces(char* str){
+	if(!*str){
+		free(str);
+		return NULL;
+	}
 	char *start,*end;
 	start=str;
-	while(isspace(*(start++)));
-	start--;
+	for(;isspace(*(start));start++);
 	if(!*start){
 		free(str);
 		return NULL;
 	}
 	end = start+strlen(start)-1;
-	while(isspace(*(end--)) && end>start);
-	end[2] = 0;
+	for(;isspace(*(end)) && end>start;end--);
+	end[1] = 0;
 	char *ret = strdup(start);
 	free(str);
 	return ret;
@@ -32,15 +35,14 @@ char* deleteSpaces(char* str){
 
 int count(char* str,char c){
 	int ct = 0;
-	for(int i = 0;str[i];ct+=(str[i++]==c));
+	for(;(str=strchr(str,c));ct++,str++);
 	return ct;
 }
 
 int countStr(char* str, char* s){
-	int i = 0;
-	char* p = str;
-	for(;(p=strstr(p,s));i++,p++);
-	return i;
+	int ct = 0;
+	for(;(str=strstr(str,s));ct++,str++);
+	return ct;
 }
 
 bool strlncmp(char** l1, char** l2, int n1,int n2){
@@ -53,4 +55,55 @@ bool strlncmp(char** l1, char** l2, int n1,int n2){
 		}
 	}
 	return true;
+}
+
+/*
+char** _tokenize(char* str, ...){
+	va_list args;
+	va_start(args,str);
+	char *arg,*s=strdup(str);
+	char** tokens = NULL;
+	int len = strlen(str),size=0;
+	for(int i = 0;(arg=va_arg(args,char*))!=NULL;i++){
+		int p;
+		while((p=strcspn(str,arg))!=len){
+			for(int j = 0;i<strlen(arg);i++){
+				s[p+j] = 0;
+			}
+		}
+	}
+	va_end(args);
+	char* p = s;
+	for(int i = 0;i<len;i++){
+		tokens = realloc(tokens,(size+1)*sizeof(*tokens));
+		tokens[size++] = strdup(p);
+		p+=strlen(p);
+		for(;i<len && !*p;i++,p++);
+	}
+	free(s);
+	return tokens;
+}
+*/
+char* tokenize(char** str,const char* format){
+	char* fmt = strdup(format);
+	size_t len = strlen(*str), min = len,tokenLen = 1;
+	for(size_t i = 0;i<strlen(format);){
+		size_t pos = i;
+		for(;fmt[pos] == fmt[pos+1];pos++);
+		char tmp = fmt[++pos];
+		fmt[pos] = 0;
+		char* substr = strstr(*str,fmt+i);
+		//printf("%s %s\n",substr,fmt+i);
+		min = (substr && (substr-*str)<min)?tokenLen=strlen(fmt+i),substr-*str:min;
+		//tokenLen = (strlen(fmt+i)>tokenLen)?strlen(fmt+i):tokenLen;
+		i+=strlen(fmt+i);
+		fmt[pos] = tmp;
+	}
+	free(fmt);
+	if(min!=len){
+		char* ret = strndup(*str,min);
+		*str+=min+tokenLen;
+		return ret;
+	}
+	return NULL;
 }

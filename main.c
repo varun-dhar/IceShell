@@ -54,11 +54,13 @@ SUCH DAMAGE.
 #include "parsing.h"
 
 char *prompt = NULL;
-struct hashmap_s aliases;
+extern struct hashmap_s aliases;
 
 int main(void){
-	init(&aliases);
+	init();
 	using_history();
+	if(read_history(".ish_history"))
+		perror("read_history");
 	signal(SIGINT,SIG_IGN);
 	char* buf = NULL;
 	while((buf=readline(getPrompt(&prompt)))){
@@ -72,18 +74,23 @@ int main(void){
 		add_history(buf);
 		if(!strncmp(buf,"cd",2)){
 			int argc;
-			char** argv = argSplit(buf,&argc," \n");
+			char** argv = replaceEV(buf,&argc);
 			changeDir(argc,argv);
 			for(int i = 0;i<argc;i++){
 				free(argv[i]);
 			}
 			free(argv);
 		}else{
-			exec(buf,&aliases);
+			exec(buf,false,NULL,false);
 		}
 		free(buf);
 	}
 	puts("");
 	free(prompt);
 	aliasCleanup(&aliases);
+	char* hist = malloc(strlen(getenv("HOME"))+sizeof("/.ish_history"));
+	sprintf(hist,"%s/.ish_history",getenv("HOME"));
+	if(write_history(hist))
+		perror("write_history");
+	free(hist);
 }

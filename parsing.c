@@ -15,18 +15,35 @@ and limitations under the License.
 #include "parsing.h"
 
 char** argSplit(char* args, int *n, const char* fmt){
+	*n=0;
+	char** argv = NULL;
+	char* p;
+	while((p=tokenize(&args,fmt))){
+		if((p = deleteSpaces(p))){
+			argv = realloc(argv,(*n+1)*sizeof(*argv));
+			argv[(*n)++] = p;
+		}
+	}
+	if((p = deleteSpaces(strdup(args)))){
+		argv = realloc(argv,(*n+1)*sizeof(*argv));
+		argv[((*n)?(*n)++:*n)] = p;
+	}
+	return argv;
+}
+
+/*char** argSplit(char* args, int *n, const char* fmt){
 	char* argCopy = strdup(args);
 	char* arg = argCopy;
 	*n=0;
 	char** argv = NULL;
-	char* p;
+	char* p = arg;
 	while((p=strsep(&arg,fmt))){
 		argv = realloc(argv,(*n+1)*sizeof(*argv));
 		argv[(*n)++] = strdup(p);
 	}
 	free(argCopy);
 	return argv;
-}
+}*/
 
 void getRedir(char* args,char** in, char** out, bool* append, int* stream){
 	char* s;
@@ -57,6 +74,7 @@ void getRedir(char* args,char** in, char** out, bool* append, int* stream){
 }
 
 char** replaceEV(char* args,int* n){
+	if(!args || !*args){return NULL;}
 	wordexp_t p;
 	if(wordexp(args,&p,0)){
 		printf("Syntax error\n");
@@ -71,8 +89,9 @@ char** replaceEV(char* args,int* n){
 	return argv;
 }
 
-char** aliasReplace(char** argv, int* argc,struct hashmap_s *map){
-	char* alias = hashmap_get(map,argv[0],strlen(argv[0]));
+char** aliasReplace(char** argv, int* argc){
+	extern struct hashmap_s aliases;
+	char* alias = hashmap_get(&aliases,argv[0],strlen(argv[0]));
 	if(alias){
 		int aliasArgc;
 		char** aliasArgv = replaceEV(alias,&aliasArgc);
@@ -105,5 +124,136 @@ char** aliasReplace(char** argv, int* argc,struct hashmap_s *map){
 	}else{
 		return argv;
 	}
-	return aliasReplace(argv,argc,map);
+	return aliasReplace(argv,argc);
+}
+
+char* parseNested(char* args){
+	char* p = args;
+	while((p=strstr(p,"$("))){
+		if(p==args || *(p-1)!='\\'){
+			char* end = NULL;
+			int depth = 0, len = 0;
+			for(int i = 1;i<strlen(p);i++){
+				if(!strncmp(p+i,"$(",2) && ((p+i-1)==args || p[i-1] != '\\')){
+					depth++;
+					len++;
+					continue;
+				}
+				if(p[i] == ')' && !depth){
+					end = p+i;
+					break;
+				}else if(p[i] == ')'){
+					depth--;
+				}
+			}
+//			while((end=strchr(p,')')) && *(end-1) == '\\');
+			if(!end){
+				puts("Syntax error");
+				return NULL;
+			}
+
+			if(!(end-(p+3*(len+1))+1)){
+				char* tmp = (p==args)?"":strndup(args,p-args);
+				sprintf(args,"%s%s",tmp,end+1);
+				if(*tmp)free(tmp);
+				continue;
+			}
+			char* cmd = strndup(p+2,end-(p+2));
+			char* ret = NULL;
+			exec(cmd,true,&ret,false);
+//			ret = (!ret)?"":ret;
+			free(cmd);
+			if(!ret){
+				char* tmp = malloc(p-args+strlen(end+1)+2);
+				strncpy(tmp,args,p-args);
+				tmp[p-args] = 0;
+				strcat(tmp,end+1);
+				free(args);
+				p = tmp+(p-args);
+				args = tmp;
+			}else{
+				int retLen = strlen(ret);
+				char* tmp = malloc(p-args+strlen(end+1)+retLen+1);
+				strncpy(tmp,args,p-args);
+				tmp[p-args] = 0;
+				sprintf(tmp,"%s%s%s",tmp,ret,end+1);
+				free(ret);
+				p = tmp+(p-args+retLen);
+				free(args);
+				args = tmp;
+			}
+		}else{
+			p++;
+		}
+	}
+	return args;
+}
+
+char* parseMP(char* args){
+	int n;
+	char** tokens = argSplit(args,&n,"&&");
+	printf("1: n: %d\n",n);
+	for(int i = 0;i<n;i++)puts(tokens[i]);
+	if(!n){
+		puts("1");
+		free(*tokens);
+		free(tokens);
+		tokens = argSplit(args,&n,"&");
+		puts("at bg");
+		printf("2: n: %d\n",n);
+		if(!n){
+			free(*tokens);
+			free(tokens);
+			return args;
+		}
+		for(int i = 0;i<n;i++){
+			if(i!=(n-1)){
+				//no wait
+				exec(tokens[i],false,NULL,true);
+			}else{
+				//normal
+				exec(tokens[i],false,NULL,false);
+			}
+			free(tokens[i]);
+		}
+		free(tokens);
+		free(args);
+		return NULL;
+	}
+	for(int i = 0;i<n;i++){
+		if(i!=(n-1)){
+			extern int exitCode;
+			exec(tokens[i],false,NULL,false);
+			if(exitCode){
+				for(;i<n;i++){
+					free(tokens[i]);
+				}
+				break;
+			}
+		}else{
+			int bgn;
+			char** bg = argSplit(tokens[i],&bgn,"&");
+			if(!bgn){
+				free(*bg);
+				free(bg);
+				exec(tokens[i],false,NULL,false);
+			}else{
+				for(int j = 0;j<bgn;j++){
+					if(j!=(bgn-1)){
+						//no wait
+						exec(bg[j],false,NULL,true);
+					}else{
+						//normal
+						exec(bg[j],false,NULL,false);
+					}
+					free(bg[j]);
+				}
+				free(bg);
+			}
+		}
+		free(tokens[i]);
+	}
+	free(tokens);
+	free(args);
+	return NULL;
 }

@@ -11,15 +11,19 @@ License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF 
 either express or implied. See the License for the specific language governing permissions 
 and limitations under the License.
 */
-#ifndef _STRPROCESSOR_H
-#define _STRPROCESSOR_H
+#ifndef _STRPROCESSING_H
+#define _STRPROCESSING_H
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdarg.h>
+
+//#define tokenize(str,...) _tokenize(str,__VA_ARGS__,NULL)
 
 char* deleteSpaces(char* str);
 int count(char* str,char c);
 int countStr(char* str, char* s);
 bool strlncmp(char** l1, char** l2, int n1,int n2);
+char* tokenize(char** str,const char* fmt);
 #endif

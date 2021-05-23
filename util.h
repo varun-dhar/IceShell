@@ -23,6 +23,7 @@ and limitations under the License.
 #include <unistd.h>
 #include <signal.h>
 #include <limits.h>
+#include <getopt.h>
 #include "hashmap.h"
 #include "strprocessing.h"
 #include "parsing.h"
@@ -34,13 +35,29 @@ and limitations under the License.
 #define BLUE "\001\e[1;34m\002"
 #define RESET "\001\e[0m\002"
 
+int exitCode;
+struct hashmap_s aliases;
+
+typedef struct{
+	char** args;
+	int len;
+	bool saveOutput;
+	char* output;
+	bool bg;
+	char* in;
+	char* out;
+	bool append;
+	int stream;
+	int fd;
+	bool last;
+}command;
+
 unsigned int round2(unsigned int n);
-void readConfig(struct hashmap_s *aliases);
+void readConfig();
 int freeHashmapElements(void* const ctx, struct hashmap_element_s* const e);
 void aliasCleanup(struct hashmap_s *map);
-void init(struct hashmap_s *aliases);
+void init();
 char* getPrompt(char** prompt);
-void changeDir(int argc,char** argv);
-int execProg(char** argv,char* in, char* out, bool append, int stream, int* fd, bool last);
-void exec(char* args,struct hashmap_s *aliases);
+int execProg(char** argv,char* in, char* out, bool append, int stream, int* fd, bool last, bool saveOutput, char** output,bool bg);
+void exec(char* args,bool saveOutput, char** output, bool bg);
 #endif

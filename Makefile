@@ -1,5 +1,5 @@
 CFLAGS := -fsanitize=address,leak,undefined -ggdb3
-CC := gcc
+CC := cc
 LFLAGS := -ledit
 OBJ := obj
 SOURCES := $(wildcard *.c)
