@@ -27,6 +27,7 @@ and limitations under the License.
 #include "hashmap.h"
 #include "strprocessing.h"
 #include "parsing.h"
+#include "ll.h"
 
 #define WRITE_END 1
 #define READ_END 0
@@ -36,21 +37,33 @@ and limitations under the License.
 #define RESET "\001\e[0m\002"
 
 int exitCode;
-struct hashmap_s aliases;
+struct hashmap* aliases;
 
-typedef struct{
-	char** args;
+struct commandData{
+	LL(char*,args);
 	int len;
 	bool saveOutput;
 	char* output;
 	bool bg;
-	char* in;
-	char* out;
+	char* infile;
+	int infd;//to input
+	char* outfile;
+	int outfd;//from output to file
+	int ostream;//output stream
 	bool append;
-	int stream;
-	int fd;
 	bool last;
-}command;
+};
+
+
+typedef struct{
+	LL(struct commandData,data);
+	LL_NODE(data) curr;
+}Command;
+
+typedef struct alias{
+	char* name;
+	char* command;
+}alias;
 
 unsigned int round2(unsigned int n);
 void readConfig();

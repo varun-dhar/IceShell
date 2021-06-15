@@ -59,7 +59,7 @@ extern struct hashmap_s aliases;
 int main(void){
 	init();
 	using_history();
-	if(read_history(".ish_history"))
+	if(read_history("~/.ish_history"))
 		perror("read_history");
 	signal(SIGINT,SIG_IGN);
 	char* buf = NULL;
@@ -72,17 +72,7 @@ int main(void){
 			continue;
 		}
 		add_history(buf);
-		if(!strncmp(buf,"cd",2)){
-			int argc;
-			char** argv = replaceEV(buf,&argc);
-			changeDir(argc,argv);
-			for(int i = 0;i<argc;i++){
-				free(argv[i]);
-			}
-			free(argv);
-		}else{
-			exec(buf,false,NULL,false);
-		}
+		exec(buf,false,NULL,false);
 		free(buf);
 	}
 	puts("");

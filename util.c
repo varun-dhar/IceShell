@@ -13,51 +13,50 @@ and limitations under the License.
 */
 #include "util.h"
 
-unsigned int round2(unsigned int n){
-	n--;
-	n|=n>>1;
-	n|=n>>2;
-	n|=n>>4;
-	n|=n>>8;
-	n|=n>>16;
-	return ++n;
+int aliasCompare(const void* a,const void* b,void* data){
+	const alias* a1 = a;
+	const alias* a2 = b;
+	return strcmp(a1->name,a2->name);
+}
+
+uint64_t aliasHash(const void* item,uint64_t seed0,uint64_t seed1){
+	const alias* a = item;
+	return hashmap_sip(item,strlen(a->name),seed0,seed1);
 }
 
 void readConfig(){
-	extern struct hashmap_s aliases;
+	extern struct hashmap* aliases;
 	char* path = malloc(strlen(getenv("HOME"))+sizeof("/.ishrc"));
 	sprintf(path,"%s/.ishrc",getenv("HOME"));
-	struct stat file;
-	stat(path,&file);
 	FILE* conf = fopen(path,"r");
 	free(path);
-	char* buf = malloc(file.st_size+1);
-	fread(buf,1,file.st_size,conf);
-	fclose(conf);
-	buf[file.st_size] = 0;
-	hashmap_create(round2(countStr(buf,"alias")),&aliases);
-	char* p = buf;
-	while((p=strstr(p,"alias"))){
-		char *key = NULL, *value = NULL;
+	aliases = hashmap_new(sizeof(struct alias),0,0,0,aliasCompare,user_compare,NULL);
+	char* p = NULL;
+	int n = 0;
+	while(getline(&p,&n,conf) != -1){
+/*		char *key = NULL, *value = NULL;
 		if(sscanf(p++,"alias %m[^=]=\"%m[^\"]\"",&key,&value)!=2){
 			if(key){free(key);}
 			if(value){free(value);}
 			continue;
 		}
-		hashmap_put(&aliases,key,strlen(key),value);
+		hashmap_put(&aliases,key,strlen(key),value);*/
+		exec(p,false,NULL,false);
+		free(p);
 	}
-	free(buf);
+	fclose(conf);
 }
 
-int freeHashmapElements(void* const ctx, struct hashmap_element_s* const e){
-	free((char*)e->key);
-	free(e->data);
+bool freeHashmapElements(const void* item, void* data){
+	const alias* a = item;
+	free(a->name);
+	free(a->command);
 	return -1;
 }
 
-void aliasCleanup(struct hashmap_s *map){
-	hashmap_iterate_pairs(map,freeHashmapElements,NULL);
-	hashmap_destroy(map);
+void aliasCleanup(struct hashmap *map){
+	hashmap_scan(map,freeHashmapElements,NULL);
+	hashmap_free(map);
 }
 
 
@@ -83,49 +82,6 @@ char* getPrompt(char** prompt){
 	free(host);
 	free(wd);
 	return *prompt;
-}
-
-void changeDir(int argc,char** argv){
-	if(argc==1 || !strcmp(argv[1],getenv("HOME")) || !strcmp(argv[1],"~")){
-		setenv("PWD",getenv("HOME"),1);
-		chdir(getenv("HOME"));
-		return;
-	}else{
-		char *res = realpath(argv[1],NULL);
-		if(!res){
-			char* cat = malloc(strlen(getenv("PWD"))+strlen(argv[1])+2);
-			sprintf(cat,"%s/%s",getenv("PWD"),argv[1]);
-			res = realpath(cat,NULL);
-			free(cat);
-			if(res){
-				struct stat isdir;
-				if(stat(res,&isdir)){
-					free(res);
-					return;
-				}
-				if(S_ISDIR(isdir.st_mode)){
-					setenv("PWD",res,1);
-					chdir(res);
-					free(res);
-					return;
-				}
-			}
-			printf("cd: %s: No such file or directory\n",argv[1]);
-			return;
-		}
-		struct stat isdir;
-		if(stat(res,&isdir)){
-			free(res);
-			return;
-		}
-		if(S_ISDIR(isdir.st_mode)){
-			setenv("PWD",res,1);
-			chdir(res);
-			free(res);
-			return;
-		}
-	}
-	printf("cd: %s: No such file or directory\n",argv[1]);
 }
 
 int execProg(char** argv,char* in, char* out,bool append,int stream, int* fd, bool last,bool saveOutput, char** output, bool bg){
@@ -311,103 +267,4 @@ pCleanup:
 		free(argPipes[i]);
 	}
 	free(argPipes);
-}
-
-void history(char** argv){
-	if(!argv[1]){
-		HIST_ENTRY** list = history_list();
-		for(int i = 0;list[i];i++){
-			printf(" %04d  %s\n",i,list[i]->line);
-		}
-		return;
-	}
-
-	int argc = 0;
-	while(argv[argc++]);
-	argc--;
-	int opt;
-	char ops = 0;
-	extern char* optarg;
-	extern int history_length;
-	extern int optind;
-	while((opt=getopt(argc,argv,"cd:a::n::r:w::p:s:"))!=-1){
-		switch(opt){
-			case 'c':
-				stifle_history(0);
-				unstifle_history();
-				break;
-			case 'r':
-				read_history(optarg);
-				break;
-			case 'p':
-			case 's':
-				ops|=(1<<(opt%8));
-				break;
-			case '?':
-				printf("%s: history: Invalid argument\n",getenv("0"));
-				break;
-			default:
-				break;
-		}
-		if(opt=='d'){
-			int index = strtol(optarg,NULL,10);
-			if(!index){
-				printf("%s: history: History position out of range.\n",getenv("0"));
-				continue;
-			}
-			index = (index<0)?history_length+index:index;
-			HIST_ENTRY* e = remove_history(index);
-			free((char*)e->line);
-			free((char*)e->data);
-			free(e);
-		}else if(opt=='w' || opt=='a'){
-			if(optarg){
-				write_history(optarg);
-			}else{
-				char* hist = malloc(strlen(getenv("HOME"))+sizeof("/.ish_history"));
-				sprintf(hist,"%s/.ish_history",getenv("HOME"));
-				write_history(hist);
-				free(hist);
-			}
-		}else if(opt=='n'){
-			if(optarg){
-				read_history(optarg);
-			}else{
-				char* hist = malloc(strlen(getenv("HOME"))+sizeof("/.ish_history"));
-				sprintf(hist,"%s/.ish_history",getenv("HOME"));
-				read_history(hist);
-				free(hist);
-			}
-		}
-	}
-	if(ops&(1<<('p'%8))){
-		for(int i = optind;argv[i];i++){
-			char* expanded;
-			history_expand(argv[i],&expanded);
-			puts(expanded);
-			free(expanded);
-		}
-	}
-	if(ops&(1<<('s'&8))){
-		char* entry = malloc(1);
-		*entry = 0;
-		int size = 0;
-		for(int i = optind;argv[i];i++){
-			entry = realloc(entry,(size=size+strlen(argv[i])+1));
-			sprintf(entry,"%s %s",entry,argv[i]);
-		}
-		add_history(entry);
-		free(entry);
-	}
-	if(argv[optind]){
-		int len;
-		if(!(len=strtol(optarg,NULL,10))){
-			exit(0);
-		}
-		for(int i = history_length-len;i<history_length;i++){
-			HIST_ENTRY* entry = history_get(i);
-			printf(" %04d %s\n",i,entry->line);
-		}
-	}
-	exit(0);
 }

@@ -142,3 +142,21 @@ void history(char** argv){
 	exit(0);
 }
 
+void alias(char* args){
+	char* name;
+	char* cmd;
+	extern struct hashmap* aliases;
+	hashmap_set(aliases,&(struct alias){.name=name,.command=cmd});
+	free(name);
+	free(cmd);
+}
+
+void unalias(char* args){
+	char* name;
+	extern struct hashmap* aliases;
+	alias* a = hashmap_delete(aliases,&(struct alias){.name=name});
+	free(name);
+	free(a->name);
+	free(a->command);
+	free(a);
+}

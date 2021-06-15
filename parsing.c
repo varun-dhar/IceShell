@@ -90,8 +90,8 @@ char** replaceEV(char* args,int* n){
 }
 
 char** aliasReplace(char** argv, int* argc){
-	extern struct hashmap_s aliases;
-	char* alias = hashmap_get(&aliases,argv[0],strlen(argv[0]));
+	extern struct hashmap* aliases;
+	char* alias = hashmap_get(aliases,&(struct alias){.name=argv[0]});
 	if(alias){
 		int aliasArgc;
 		char** aliasArgv = replaceEV(alias,&aliasArgc);
