@@ -1,5 +1,5 @@
 # IceShell
-A simple shell. 
+A simple shell. Should run on all POSIX compliant systems, though I've only tested it on Linux.
 > So cool, its *ice*
 
 ## About
